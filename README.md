@@ -1,2 +1,2 @@
-# js-test-utils
-Utility functions for testing small javascript libraries  
+# test-utils-js
+Utility functions I use for testing small javascript projects.
