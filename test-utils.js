@@ -5,8 +5,11 @@ export function assertTrue(expr = null) {
 }
 
 export function assertEqual(exprA, exprB) {
+  if (typeof (exprA) === 'object' || typeof (exprB) === 'object') {
+    console.error("assertEqual: Can't compare objects:", exprA, exprB);
+  }
   if (exprA !== exprB) {
-    throw new Error(`Assertion error:\n${exprA}\n\n!==\n\n${exprB}`);
+    throw new Error(`assertEqual:\n${exprA}\n\n!==\n\n${exprB}`);
   }
 }
 
