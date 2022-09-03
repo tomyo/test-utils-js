@@ -18,15 +18,13 @@ export function isDomElement(entity) {
 }
 
 /**
-* Waits until `fun` resolves into a truthy value, 
+* Waits until `fun` resolves into a truthy value,
 * every `checkIntervalTime` ms, `retries` times.
 * @param {function} fun - a function to execute every
 * @param {number} checkIntervalTime - re-check every miliseconds
 * @param {number} retries - How many times to retry before failing with a timeout error
 */
 export async function waitFor(fun, checkIntervalTime = 200, retries = 10) {
-
-
   if (typeof fun !== 'function') {
     throw new Error('waitFor only accepts a function as argument')
   }
@@ -55,28 +53,71 @@ export async function waitFor(fun, checkIntervalTime = 200, retries = 10) {
 
 
 /**
- * Given an object of testNames and functions, run them while creating a summary.
- * A `test` broadcast channel is used to send the summary.
- * That is useful when testing in isolation, for example: inside iframes. 
- * @param {object} tests - {testName: testFunction(), ...} 
+ * @typedef {Object} runTestsOptions
+ * @param {function} beforeEach - function to run before each test
+ * @param {function} afterEach - function oi run after each test
+ * @param {string} channelName - Named of BroadcastChannel used
+ * @param {boolean} abortOnFailedTest - Don't test further when a test
+ * @param {number} timeout - miliseconds until test is considered to fail
  */
-export async function runTests(tests = {}) {
-  const finishedBroadcast = new BroadcastChannel('tests');
 
+/**
+ * @constant
+ * @type {runTestsOptions}
+ * @default
+ */
+const runTestsDefaultOptions = {
+  channelName: 'tests',
+  abortOnFailedTest: false,
+  timeout: 3000,
+}
+
+export const testReportTypes = {
+  TEST_REPORT: 'test-report',
+  BATCH_REPORT: 'batch-report',
+}
+
+/**
+ * Given an object  of testNames and functions, run them while creating a summary.
+ * A `test` broadcast channel is used to send the summary.
+ * That is useful when testing in isolation, for example: inside iframes.
+ * @param {Object} tests - {testName: testFunction(), ...}
+ * @param {runTestsOptions} options - Extra options, including beforeEach and afterEach functions
+ */
+export async function runTests(tests = {}, options = {}) {
+  const {
+    beforeEach, afterEach, channelName, abortOnFailedTest
+  } = { ...runTestsDefaultOptions, ...options }
   const summary = [];
-  for (const [name, test] of Object.entries(tests)) {
+  const testsBroadcast = new BroadcastChannel(channelName);
+  const location = JSON.parse(JSON.stringify(document.location));
 
+  for (const [name, test] of Object.entries(tests)) {
+    const testReport = { name, location }
     try {
+      if (beforeEach) beforeEach();
       await test();
+
       console.info(`✔ ${name}`);
-      summary.push(`✔ ${name}`);
-    } catch (error) {
-      console.warn(`✘ ${name}`, error);
-      summary.push(`✘ ${name}`);
-      throw error;
-      // Throwing the error gives a nice traceback in console. 
-      // But then we get stop-at-first-error behaviour.
+      testReport.status = 'passed';
+    }
+    catch (error) {
+      console.error(`✘ ${name}`, error);
+      testReport.status = 'failed';
+      testReport.error = error;
+      if (abortOnFailedTest) throw error;
+    }
+    finally {
+      summary.push(testReport)
+      testsBroadcast.postMessage({
+        type: testReportTypes.TEST_REPORT,
+        data: testReport
+      });
+      if (afterEach) afterEach();
     }
   }
-  finishedBroadcast.postMessage(summary);
+  testsBroadcast.postMessage({
+    type: testReportTypes.BATCH_REPORT,
+    data: { location, summary }
+  });
 }
