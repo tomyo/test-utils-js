@@ -1,6 +1,6 @@
 export function assertTrue(expr = null) {
   if (!!expr !== true) {
-    throw new Error(`Assertion error: given expression (${expr}) is falsy`);
+    throw new Error(`Assertion error: given expression is falsy.`);
   }
 }
 
