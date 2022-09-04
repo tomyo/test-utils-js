@@ -18,6 +18,49 @@ export function isDomElement(entity) {
 }
 
 /**
+ * If `beforeCallback` or `afterCallback` return a truthy value,
+ * an early return with that value happens.
+ *
+ * @param {Object} scope
+ * @param {String} funcName
+ * @param {Function} beforeCallback
+ * @param {Function} afterCallback
+ */
+export function mockOnce(scope, funcName, beforeCallback = () => { }, afterCallback = () => { }) {
+  const originalFun = scope[funcName];
+
+  function restoreScope(value) {
+    scope[funcName] = originalFun;
+  }
+
+  async function mocked(...args) {
+    let earlyReturnValue, result, error;
+    if (earlyReturnValue = await beforeCallback(...args)) {
+      restoreScope();
+      return earlyReturnValue;
+    }
+
+    try {
+      result = await originalFun(...args);
+    }
+    catch (error) {
+      error = error;
+    }
+    finally {
+      restoreScope();
+      if (earlyReturnValue = await afterCallback(result, error)) {
+        return earlyReturnValue;
+      }
+
+      if (error) throw error;
+      return result;
+    }
+  }
+
+  scope[funcName] = (...args) => mocked(...args);
+}
+
+/**
 * Waits until `fun` resolves into a truthy value,
 * every `checkIntervalTime` ms, `retries` times.
 * @param {function} fun - a function to execute every
